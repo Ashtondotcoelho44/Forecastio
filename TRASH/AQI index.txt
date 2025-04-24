@@ -1,0 +1,10 @@
+AQI Categories:
+Here’s a breakdown of AQI categories and their corresponding health impacts:
+
+AQI Range	Category	Health Implications
+0–50	Good	Air quality is satisfactory, and air pollution poses little or no risk.
+51–100	Satisfactory	Air quality is acceptable; however, there may be a risk for some sensitive groups.
+101–200	Moderate	Sensitive individuals may experience health effects; the general public is less likely to be affected.
+201–300	Poor	Everyone may begin to experience health effects; sensitive groups may experience more serious effects.
+301–400	Very Poor	Health alert: The risk of health effects is increased for everyone.
+401–500	Severe	Health warning of emergency conditions; the entire population is more likely to be affected.

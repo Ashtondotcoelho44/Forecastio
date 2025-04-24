@@ -1,0 +1,369 @@
+PREVIOUS ( HARD CODED )
+
+fetchAQI.jsx
+import axios from "axios";
+
+const API_KEY = "8030a845-ab1e-42c6-97e9-db315793253d"; // ✅ API Key
+const API_BASE_URL = "https://api.airvisual.com/v2/city";
+const RATE_LIMIT_DELAY = 5000; // 5 seconds delay between retries
+
+// Cache to temporarily store AQI data (to avoid excessive API requests)
+const aqiCache = new Map();
+
+const cityStateMap = {
+  "mumbai": "Maharashtra",
+  "delhi": "Delhi",
+  "jaipur": "Rajasthan",
+  "bangalore": "Karnataka",
+  "kolkata": "West Bengal",
+  "chennai": "Tamil Nadu",
+  "hyderabad": "Telangana",
+  "pune": "Maharashtra",
+  "ahmedabad": "Gujarat",
+  "lucknow": "Uttar Pradesh",
+  "patna": "Bihar",
+  "bhopal": "Madhya Pradesh",
+  "indore": "Madhya Pradesh",
+  "chandigarh": "Chandigarh",
+  "guwahati": "Assam",
+  "coimbatore": "Tamil Nadu",
+  "visakhapatnam": "Andhra Pradesh",
+  "nagpur": "Maharashtra",
+  "surat": "Gujarat",
+  "thiruvananthapuram": "Kerala",
+};
+
+// Function to fetch AQI
+export const fetchAQI = async (city) => {
+  if (!city) {
+    console.error("❌ Error: No city provided.");
+    return null;
+  }
+
+  const formattedCity = city.split(",")[0].trim().toLowerCase();
+  const matchedCity = Object.keys(cityStateMap).find((key) => key.toLowerCase() === formattedCity);
+
+  if (!matchedCity) {
+    console.error(`❌ Error: No state found for city: ${city}`);
+    return null;
+  }
+
+  const state = cityStateMap[matchedCity];
+
+  // Check if AQI is already cached
+  if (aqiCache.has(matchedCity)) {
+    console.log(`⚡ Using cached AQI for ${matchedCity}: ${aqiCache.get(matchedCity)}`);
+    return aqiCache.get(matchedCity);
+  }
+
+  const url = `${API_BASE_URL}?city=${encodeURIComponent(matchedCity)}&state=${encodeURIComponent(state)}&country=India&key=${API_KEY}`;
+
+  console.log(`📡 Fetching AQI from: ${url}`);
+
+  try {
+    const response = await axios.get(url);
+
+    if (response.data && response.data.status === "success") {
+      const aqi = response.data.data.current.pollution.aqius;
+      console.log(`✅ AQI for ${matchedCity}: ${aqi}`);
+
+      // Cache AQI for 10 minutes
+      aqiCache.set(matchedCity, aqi);
+      setTimeout(() => aqiCache.delete(matchedCity), 10 * 60 * 1000);
+
+      return aqi;
+    } else {
+      console.error(`⚠️ API response error for ${matchedCity}:`, response.data);
+      return null;
+    }
+  } catch (error) {
+    if (error.response && error.response.status === 429) {
+      console.warn(`⏳ Rate limit hit! Retrying in ${RATE_LIMIT_DELAY / 1000} seconds...`);
+      await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_DELAY));
+      return fetchAQI(city);
+    }
+
+    console.error(`❌ Error fetching AQI for ${matchedCity}:`, error.message);
+    return null;
+  }
+};
+
+
+Index.jsx 
+
+import { useContext, createContext, useState, useEffect } from "react";
+import axios from "axios";
+import { fetchAQI } from "../api/fetchAQI";
+
+
+const StateContext = createContext();
+
+export const StateContextProvider = ({ children }) => {
+    const [weather, setWeather] = useState({});
+    const [values, setValues] = useState([]);
+    const [place, setPlace] = useState("Mumbai");
+    const [thisLocation, setLocation] = useState("");
+    const [currentAQI, setCurrentAQI] = useState(null);
+
+    const fetchWeather = async () => {
+        const options = {
+            method: "GET",
+            url: "https://visual-crossing-weather.p.rapidapi.com/forecast",
+            params: {
+                aggregateHours: "24",
+                location: place,
+                contentType: "json",
+                unitGroup: "metric",
+                shortColumnNames: 0,
+            },
+            headers: {
+                "X-RapidAPI-Key": import.meta.env.VITE_API_KEY,
+                "X-RapidAPI-Host": "visual-crossing-weather.p.rapidapi.com",
+            },
+        };
+
+        try {
+            const response = await axios.request(options);
+            console.log("Weather Data:", response.data);
+            const thisData = Object.values(response.data.locations)[0];
+            setLocation(thisData.address);
+            setValues(thisData.values);
+            setWeather(thisData.values[0]);
+        } catch (e) {
+            console.error(e);
+            alert("This place does not exist");
+        }
+    };
+
+    useEffect(() => {
+        fetchWeather();
+    
+        fetchAQI(place, "Maharashtra").then((data) => {
+            console.log("Fetched AQI Data:", data);  // Debugging log
+            setCurrentAQI(data);
+        }).catch((error) => {
+            console.error("Error fetching AQI:", error);
+        });
+    
+    }, [place]);
+
+    return (
+        <StateContext.Provider value={{ weather, setPlace, values, thisLocation, place, currentAQI }}>
+            {children}
+        </StateContext.Provider>
+    );
+};
+
+export const useStateContext = () => useContext(StateContext);
+
+App.jsx
+
+import { useState } from 'react';
+import './App.css';
+import search from './assets/icons/search.svg';
+import { useStateContext } from './Context';
+import { BackgroundLayout, WeatherCard, MiniCard } from './Components';
+
+function App() {
+  const [input, setInput] = useState('');
+  const { weather, thisLocation, values, place, setPlace, currentAQI } = useStateContext();
+  const [darkMode, setDarkMode] = useState(false); 
+
+  const submitCity = () => {
+    setPlace(input);
+    setInput('');
+  };
+
+  return (
+    <div className={`w-full h-screen text-white px-8 ${darkMode ? 'bg-black' : ''}`}>
+      <nav className="w-full p-3 flex justify-between items-center">
+        <h1 className="font-bold tracking-wide text-3xl">FORECASTIO</h1>
+        <div className="flex items-center gap-4">
+          <div className="bg-white w-[15rem] overflow-hidden shadow-2xl rounded flex items-center p-2 gap-2">
+            <img src={search} alt="search" className="w-[1.5rem] h-[1.5rem]" />
+            <input
+              onKeyUp={(e) => {
+                if (e.key === 'Enter') {
+                  submitCity();
+                }
+              }}
+              type="text"
+              placeholder="Search city"
+              className="focus:outline-none w-full text-[#212121] text-lg"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+            />
+          </div>
+          {/* Dark Mode Toggle Button */}
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            className="p-2 bg-blue-950 text-white rounded shadow-lg hover:bg-gray-600 transition"
+          >
+            {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+          </button>
+        </div>
+      </nav>
+      {/* Background layout should be removed when dark mode is on */}
+      {!darkMode && <BackgroundLayout />}
+
+      <main className="w-full flex flex-wrap gap-8 py-4 px-[10%] items-center justify-center">
+        <WeatherCard
+          place={thisLocation}
+          windspeed={weather.wspd}
+          humidity={weather.humidity}
+          temperature={weather.temp}
+          heatIndex={weather.heatindex}
+          iconString={weather.conditions}
+          conditions={weather.conditions}
+          currentAQI={currentAQI} // Passing AQI as a prop
+        />
+
+        <div className="flex justify-center gap-8 flex-wrap w-[60%]">
+          {values?.slice(1, 7).map((curr) => (
+            <MiniCard key={curr.datetime} time={curr.datetime} temp={curr.temp} iconString={curr.conditions} />
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export default App;
+
+WeatherCard.jsx 
+
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import { useDate } from "../Utils/useDate";
+import sun from "../assets/icons/sun.png";
+import cloud from "../assets/icons/cloud.png";
+import fog from "../assets/icons/fog.png";
+import rain from "../assets/icons/rain.png";
+import snow from "../assets/icons/snow.png";
+import storm from "../assets/icons/storm.png";
+import wind from "../assets/icons/windy.png";
+import { FaInfoCircle } from "react-icons/fa";
+import "../index.css";
+
+const WeatherCard = ({
+  temperature = "N/A",
+  windspeed = "N/A",
+  humidity = "N/A",
+  place = "Location not available",
+  heatIndex = "N/A",
+  iconString = "",
+  conditions = "Weather conditions unavailable",
+  currentAQI = "N/A",
+}) => {
+  const [icon, setIcon] = useState(sun);
+  const { time } = useDate();
+  const [predictedAQI, setPredictedAQI] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  useEffect(() => {
+    if (iconString) {
+      const lowerIcon = iconString.toLowerCase();
+      if (lowerIcon.includes("cloud")) setIcon(cloud);
+      else if (lowerIcon.includes("rain")) setIcon(rain);
+      else if (lowerIcon.includes("clear")) setIcon(sun);
+      else if (lowerIcon.includes("thunder")) setIcon(storm);
+      else if (lowerIcon.includes("fog")) setIcon(fog);
+      else if (lowerIcon.includes("snow")) setIcon(snow);
+      else if (lowerIcon.includes("wind")) setIcon(wind);
+    }
+  }, [iconString]);
+
+  useEffect(() => {
+    if (!place) return;
+    const fetchPredictedAQI = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const cityName = place.split(",")[0].trim();
+        console.log(`Fetching predicted AQI for: ${cityName}`);
+        const response = await axios.post("http://127.0.0.1:5000/predict_aqi", { city: cityName });
+        console.log("Predicted AQI Response:", response.data);
+        setPredictedAQI(response.data.predicted_aqi);
+      } catch (error) {
+        setError("Error fetching predicted AQI");
+        console.error("Error fetching predicted AQI:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPredictedAQI();
+  }, [place]);
+
+  return (
+    <div className="relative w-[22rem] min-w-[22rem] h-[35rem] glassCard p-2 transition duration-300 hover:shadow-lg hover:shadow-blue-300">
+      <div
+        className="absolute top-4 right-4 text-gray-300 hover:text-white cursor-pointer"
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setTimeout(() => setShowTooltip(false), 500)}
+      >
+        <FaInfoCircle size={22} />
+      </div>
+
+      {showTooltip && (
+        <div
+          className="absolute top-10 right-2 bg-transparent text-white text-xs p-2 rounded-lg shadow-lg w-52 transition-opacity duration-300 opacity-100"
+          onMouseEnter={() => setShowTooltip(true)}
+          onMouseLeave={() => setShowTooltip(false)}
+        >
+          <p className="p-1 bg-green-500/80 text-black">Good (0-50)</p>
+          <p className="p-1 bg-yellow-500/80 text-black">Moderate (51-100)</p>
+          <p className="p-1 bg-orange-500/80 text-black">Unhealthy for Sensitive Groups (101-150)</p>
+          <p className="p-1 bg-red-500/80 text-black">Unhealthy (151-200)</p>
+          <p className="p-1 bg-[#8B0000]/80 text-white">Very Unhealthy (201-300)</p>
+          <p className="p-1 bg-[#4B0082]/80 text-white">Hazardous (301+)</p>
+        </div>
+      )}
+
+      <div className="flex w-full justify-center items-center gap-4 mt-12 mb-4">
+        <img src={icon} alt={`${iconString} icon`} className="w-16 h-16" />
+        <p className="font-bold text-5xl flex justify-center items-center">{temperature}°C</p>
+      </div>
+      <div className="font-bold text-center text-xl">{place}</div>
+      <div className="w-full flex justify-between items-center mt-4">
+        <p className="flex-1 text-center p-2">{time}</p>
+      </div>
+
+      <div className="w-full flex justify-between items-center mt-4 gap-4">
+        <p className="flex-1 text-center p-2 font-bold bg-blue-600 shadow-lg rounded-lg hover:shadow-black transition-shadow">
+          Wind Speed
+          <p className="font-normal">{windspeed} km/h</p>
+        </p>
+        <p className="flex-1 text-center p-2 font-bold rounded-lg bg-green-600 shadow-lg hover:shadow-black transition-shadow">
+          Humidity
+          <p className="font-normal">{typeof humidity === "number" ? `${humidity.toFixed(1)} gm/m³` : "N/A"}</p>
+        </p>
+      </div>
+
+      <div className="w-full flex justify-between items-center mt-4 gap-4">
+        <p className="flex-1 text-center p-2 font-bold rounded-lg bg-purple-600 shadow-lg hover:shadow-black transition-shadow">
+          Current AQI
+          <p className="font-normal">{currentAQI !== null ? currentAQI : "N/A"}</p>
+        </p>
+        <p className="flex-1 text-center p-2 font-bold rounded-lg bg-orange-600 shadow-lg hover:shadow-black transition-shadow">
+          Predicted AQI
+          <p className="font-normal">
+            {loading ? "Loading..." : error ? error : predictedAQI !== null ? predictedAQI.toFixed(1) : "N/A"}
+          </p>
+        </p>
+      </div>
+
+      <div className="w-full p-3 mt-4 flex justify-between items-center">
+        <p className="font-semibold text-lg">Heat Index</p>
+        <p className="text-lg">{heatIndex}</p>
+      </div>
+      <hr className="bg-slate-600" />
+      <div className="w-full p-4 flex justify-center items-center text-3xl font-semibold">
+        {conditions}
+      </div>
+    </div>
+  );
+};
+
+export default WeatherCard;

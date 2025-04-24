@@ -1,0 +1,1 @@
+Relative humidity is the percentage of moisture in the air relative to its maximum capacity at a given temperature. Absolute humidity is the mass of water vapor in a specific volume of air, measured in gm/m³.

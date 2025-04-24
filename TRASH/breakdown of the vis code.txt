@@ -1,0 +1,53 @@
+import matplotlib.pyplot as plt
+
+# Plotting actual vs predicted values
+plt.figure(figsize=(10, 5))
+plt.scatter(y_test, predictions, alpha=0.7)
+plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--')  # Line for perfect prediction
+plt.title('Actual vs Predicted Values')
+plt.xlabel('Actual Humidity')
+plt.ylabel('Predicted Humidity')
+plt.show()
+
+
+
+
+------------------------Breakdown of the Code-------------------------------------------------------------------------
+
+python
+
+import matplotlib.pyplot as plt
+
+This line imports the matplotlib.pyplot library, which is a widely used library for creating static, animated, and interactive visualizations in Python.
+
+python
+plt.figure(figsize=(10, 5))
+This line creates a new figure for plotting with a specified size of 10 inches wide and 5 inches tall.
+python
+plt.scatter(y_test, predictions, alpha=0.7)
+This line creates a scatter plot where:
+y_test represents the actual humidity values.
+predictions represents the predicted humidity values from your model.
+alpha=0.7 sets the transparency level of the points, making overlapping points more visible.
+python
+plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--')
+This line adds a reference line to the plot that represents perfect predictions. The line runs from the minimum actual value to the maximum actual value:
+If your predictions were perfect, all points would lie on this line.
+The 'r--' specifies that the line should be red and dashed.
+python
+plt.title('Actual vs Predicted Values')
+This sets the title of the plot to "Actual vs Predicted Values".
+python
+plt.xlabel('Actual Humidity')
+This labels the x-axis as "Actual Humidity".
+python
+plt.ylabel('Predicted Humidity')
+This labels the y-axis as "Predicted Humidity".
+python
+plt.show()
+Finally, this command displays the plot.
+Interpretation of the Plot
+Points Close to the Line: If most points are close to the dashed red line, it indicates that your model is making accurate predictions.
+Points Far from the Line: Points that are far from this line suggest larger prediction errors.
+Conclusion
+This visualization is an effective way to evaluate your model's performance qualitatively. If you run this code after training your model, you'll gain valuable insights into how well your model is performing in predicting humidity values. If you have any further questions or need additional explanations, feel free to ask!
